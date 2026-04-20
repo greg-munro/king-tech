@@ -10,22 +10,34 @@ export interface Item {
 const GCS_URL =
   'https://storage.googleapis.com/king-airnd-recruitment-sandbox-data/data.json';
 
-let cache: Item[] | null = null;
+const TTL_MS = 3 * 60 * 1000; // 3 minutes
 
-export async function loadData(): Promise<void> {
+let cache: Item[] | null = null;
+let cacheTime: number | null = null;
+
+async function fetchFromGCS(): Promise<Item[]> {
   console.log('Fetching data from GCS...');
   const res = await fetch(GCS_URL);
   if (!res.ok) {
     throw new Error(`Failed to fetch GCS data: ${res.status} ${res.statusText}`);
   }
   const json = (await res.json()) as { output: Item[] };
-  cache = json.output;
-  console.log(`Cached ${cache.length} items.`);
+  console.log(`Cached ${json.output.length} items.`);
+  return json.output;
 }
 
-export function getData(): Item[] {
-  if (!cache) {
-    throw new Error('Data not loaded yet. Call loadData() on startup.');
+export async function loadData(): Promise<void> {
+  cache = await fetchFromGCS();
+  cacheTime = Date.now();
+}
+
+export async function getData(): Promise<Item[]> {
+  const isStale = cacheTime === null || Date.now() - cacheTime > TTL_MS;
+
+  if (isStale) {
+    cache = await fetchFromGCS();
+    cacheTime = Date.now();
   }
-  return cache;
+
+  return cache!;
 }

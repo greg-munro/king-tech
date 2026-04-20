@@ -5,7 +5,7 @@ import { validateQuery } from '../utils/validateQuery';
 
 const router = Router();
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { params, errors } = validateQuery(req);
 
   if (errors.length > 0) {
@@ -13,7 +13,7 @@ router.get('/', (req, res) => {
     return;
   }
 
-  const items = getData();
+  const items = await getData();
   const result = processQuery(items, params);
 
   res.json(result);
