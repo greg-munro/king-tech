@@ -9,7 +9,7 @@ export function filterItems(items: Item[], search?: string, status?: string): It
   }
 
   if (status) {
-    result = result.filter((item) => item.status === status);
+    result = result.filter((item) => item.status.toLowerCase() === status.toLowerCase());
   }
 
   return result;

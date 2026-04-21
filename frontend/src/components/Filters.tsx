@@ -5,7 +5,7 @@ interface FiltersProps {
   onStatusChange: (val: string) => void;
 }
 
-const STATUS_OPTIONS = ['', 'active', 'inactive', 'pending'];
+const STATUS_OPTIONS = ['', 'COMPLETED', 'CANCELED', 'ERROR'];
 
 export default function Filters({ search, status, onSearchChange, onStatusChange }: FiltersProps) {
   return (
