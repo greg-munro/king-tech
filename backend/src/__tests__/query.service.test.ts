@@ -1,67 +1,42 @@
 import { processQuery } from '../services/query.service';
 import type { Item } from '../services/data.service';
 
-// Generate n items with predictable values for assertions
-function makeItems(n: number): Item[] {
-  return Array.from({ length: n }, (_, i) => ({
-    id: i + 1,
-    name: `item-${i + 1}`,
-    status: 'ACTIVE',
-    description: `description-${i + 1}`,
-    delta: i,
-    createdOn: 1000000 + i,
-  }));
-}
+const items: Item[] = [
+  { id: 3, name: 'gallant_curie', status: 'ACTIVE', description: '', delta: 0, createdOn: 3000 },
+  { id: 1, name: 'vibrant_hypatia', status: 'COMPLETED', description: '', delta: 0, createdOn: 1000 },
+  { id: 2, name: 'gallant_newton', status: 'ACTIVE', description: '', delta: 0, createdOn: 2000 },
+  { id: 4, name: 'boring_jones', status: 'PENDING', description: '', delta: 0, createdOn: 4000 },
+];
 
-describe('processQuery — pagination', () => {
-  it('returns first 20 items by default', () => {
-    const items = makeItems(50);
+describe('processQuery — pipeline order', () => {
+  it('returns all items with no params', () => {
     const result = processQuery(items, {});
-    expect(result.data).toHaveLength(20);
-    expect(result.data[0].id).toBe(1);
+    expect(result.total).toBe(4);
   });
 
-  it('returns correct slice for page 2', () => {
-    const items = makeItems(50);
-    const result = processQuery(items, { page: 2, limit: 20 });
-    expect(result.data).toHaveLength(20);
-    expect(result.data[0].id).toBe(21);
+  it('applies search before status filter', () => {
+    // 'gallant' matches id 3 + 2, both ACTIVE — status filter should narrow to those
+    const result = processQuery(items, { search: 'gallant', status: 'ACTIVE' });
+    expect(result.total).toBe(2);
+    result.data.forEach((item) => expect(item.status).toBe('ACTIVE'));
   });
 
-  it('returns correct totalPages', () => {
-    const items = makeItems(50);
-    const result = processQuery(items, { limit: 20 });
-    expect(result.totalPages).toBe(3);
+  it('applies sort after filtering', () => {
+    // filter to ACTIVE (id 3 + 2), then sort by id asc → [2, 3]
+    const result = processQuery(items, { status: 'ACTIVE', sortBy: 'id', order: 'asc' });
+    expect(result.data.map((i) => i.id)).toEqual([2, 3]);
   });
 
-  it('returns correct total count', () => {
-    const items = makeItems(50);
-    const result = processQuery(items, {});
-    expect(result.total).toBe(50);
+  it('paginates the sorted filtered set', () => {
+    // 4 items, limit 2, page 2 → last 2 items
+    const result = processQuery(items, { sortBy: 'id', order: 'asc', page: 2, limit: 2 });
+    expect(result.data.map((i) => i.id)).toEqual([3, 4]);
+    expect(result.page).toBe(2);
+    expect(result.totalPages).toBe(2);
   });
 
-  it('returns empty data array when page is beyond total', () => {
-    const items = makeItems(20);
-    const result = processQuery(items, { page: 5, limit: 20 });
-    expect(result.data).toHaveLength(0);
-  });
-
-  it('respects custom limit', () => {
-    const items = makeItems(50);
-    const result = processQuery(items, { limit: 10 });
-    expect(result.data).toHaveLength(10);
-    expect(result.totalPages).toBe(5);
-  });
-
-  it('returns all items when limit exceeds total', () => {
-    const items = makeItems(5);
-    const result = processQuery(items, { limit: 20 });
-    expect(result.data).toHaveLength(5);
-    expect(result.totalPages).toBe(1);
-  });
-
-  it('returns empty data and zero totalPages for empty dataset', () => {
-    const result = processQuery([], {});
+  it('returns empty data and correct metadata when nothing matches', () => {
+    const result = processQuery(items, { search: 'zzznomatch' });
     expect(result.data).toHaveLength(0);
     expect(result.total).toBe(0);
     expect(result.totalPages).toBe(0);

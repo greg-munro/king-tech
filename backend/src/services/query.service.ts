@@ -1,4 +1,8 @@
-import { Item } from './data.service';
+import type { Item } from './data.service';
+import { filterItems } from './filter.service';
+import { sortItems } from './sort.service';
+import { paginate } from './pagination.service';
+import type { PaginatedResult } from './pagination.service';
 
 export interface QueryParams {
   search?: string;
@@ -9,21 +13,9 @@ export interface QueryParams {
   limit?: number;
 }
 
-export interface PaginatedResult {
-  data: Item[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-// Stub — full pipeline wired in Day 2
 export function processQuery(items: Item[], params: QueryParams): PaginatedResult {
-  const page = params.page ?? 1;
-  const limit = params.limit ?? 20;
-  const total = items.length;
-  const totalPages = Math.ceil(total / limit);
-  const data = items.slice((page - 1) * limit, page * limit);
-
-  return { data, total, page, limit, totalPages };
+  const filtered = filterItems(items, params.search, params.status);
+  const sorted = sortItems(filtered, params.sortBy, params.order);
+  const result = paginate(sorted, params.page, params.limit);
+  return result;
 }
