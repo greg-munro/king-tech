@@ -5,6 +5,7 @@ interface TableProps {
   sortBy: 'id' | 'name' | 'createdOn' | undefined;
   order: 'asc' | 'desc';
   onSort: (col: 'id' | 'name' | 'createdOn') => void;
+  loading?: boolean;
 }
 
 const SORTABLE_COLUMNS: { key: 'id' | 'name' | 'createdOn'; label: string }[] = [
@@ -13,14 +14,20 @@ const SORTABLE_COLUMNS: { key: 'id' | 'name' | 'createdOn'; label: string }[] = 
   { key: 'createdOn', label: 'Created On' },
 ];
 
-export default function Table({ items, sortBy, order, onSort }: TableProps) {
+const STATUS_CLASS: Record<string, string> = {
+  COMPLETED: 'badge badge--completed',
+  CANCELED: 'badge badge--canceled',
+  ERROR: 'badge badge--error',
+};
+
+export default function Table({ items, sortBy, order, onSort, loading }: TableProps) {
   const arrow = (col: string) => {
-    if (sortBy !== col) return null;
-    return order === 'asc' ? ' ▲' : ' ▼';
+    if (sortBy !== col) return <span className="sort-arrow sort-arrow--inactive">↕</span>;
+    return <span className="sort-arrow">{order === 'asc' ? '↑' : '↓'}</span>;
   };
 
   return (
-    <div className="table-wrapper">
+    <div className={`table-wrapper${loading ? ' table-wrapper--loading' : ''}`}>
       <table>
         <thead>
           <tr>
@@ -30,7 +37,7 @@ export default function Table({ items, sortBy, order, onSort }: TableProps) {
                 onClick={() => onSort(key)}
                 className={`sortable${sortBy === key ? ' active' : ''}`}
               >
-                {label}{arrow(key)}
+                {label} {arrow(key)}
               </th>
             ))}
             <th>Status</th>
@@ -49,8 +56,12 @@ export default function Table({ items, sortBy, order, onSort }: TableProps) {
                 <td>{item.id}</td>
                 <td>{item.name}</td>
                 <td>{new Date(item.createdOn).toLocaleDateString()}</td>
-                <td>{item.status}</td>
-                <td>{item.description}</td>
+                <td>
+                  <span className={STATUS_CLASS[item.status] ?? 'badge'}>
+                    {item.status}
+                  </span>
+                </td>
+                <td className="description-cell">{item.description}</td>
                 <td>{item.delta}</td>
               </tr>
             ))

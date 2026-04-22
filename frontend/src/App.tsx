@@ -6,12 +6,29 @@ import Filters from './components/Filters';
 import Pagination from './components/Pagination';
 import './App.css';
 
+function useIsPortraitMobile() {
+  const check = () => window.innerWidth < 768 && window.innerHeight > window.innerWidth;
+  const [isPortraitMobile, setIsPortraitMobile] = useState(check);
+  useEffect(() => {
+    const handler = () => setIsPortraitMobile(check());
+    window.addEventListener('resize', handler);
+    window.addEventListener('orientationchange', handler);
+    return () => {
+      window.removeEventListener('resize', handler);
+      window.removeEventListener('orientationchange', handler);
+    };
+  }, []);
+  return isPortraitMobile;
+}
+
 interface AppState {
   data: Item[];
   loading: boolean;
+  initialLoad: boolean;
   error: string | null;
   total: number;
   totalPages: number;
+  statusCounts: Record<string, number>;
   filters: {
     search: string;
     status: string;
@@ -24,13 +41,22 @@ interface AppState {
 const LIMIT = 20;
 const DEBOUNCE_MS = 300;
 
+const STATUS_KPIS: { value: string; label: string }[] = [
+  { value: 'COMPLETED', label: 'COMPLETED' },
+  { value: 'CANCELED', label: 'CANCELED' },
+  { value: 'ERROR', label: 'ERROR' },
+];
+
 export default function App() {
+  const isPortraitMobile = useIsPortraitMobile();
   const [state, setState] = useState<AppState>({
     data: [],
     loading: true,
+    initialLoad: true,
     error: null,
     total: 0,
     totalPages: 1,
+    statusCounts: {},
     filters: {
       search: '',
       status: '',
@@ -51,7 +77,9 @@ export default function App() {
         data: result.data,
         total: result.total,
         totalPages: result.totalPages,
+        statusCounts: result.statusCounts,
         loading: false,
+        initialLoad: false,
       }));
     } catch (err) {
       setState((prev) => ({
@@ -79,12 +107,10 @@ export default function App() {
   };
 
   const handleSearchChange = (val: string) => {
-    // Update display immediately
     setState((prev) => ({
       ...prev,
       filters: { ...prev.filters, search: val },
     }));
-    // Debounce the actual fetch
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       updateFilters({ search: val });
@@ -105,33 +131,70 @@ export default function App() {
   const handlePageChange = (page: number) =>
     setState((prev) => ({ ...prev, filters: { ...prev.filters, page } }));
 
-  const { data, loading, error, total, totalPages, filters } = state;
+  const { data, loading, initialLoad, error, total, totalPages, statusCounts, filters } = state;
 
   return (
     <div className="app">
+      {isPortraitMobile && (
+        <div className="rotate-overlay">
+          <div className="rotate-message">
+            <span className="rotate-icon">⟳</span>
+            <p>Please rotate your device for the best experience</p>
+          </div>
+        </div>
+      )}
       <header className="app-header">
-        <h1>King Tech</h1>
+        <img src="/King_logo.png" alt="King Tech" className="app-logo" />
       </header>
       <main className="app-main">
-        <Filters
-          search={filters.search}
-          status={filters.status}
-          onSearchChange={handleSearchChange}
-          onStatusChange={handleStatusChange}
-        />
-        {error && <div className="error-banner">{error}</div>}
-        {loading ? (
-          <div className="spinner-container">
-            <div className="spinner" />
+        <div className="kpi-row">
+          <div className="kpi-card">
+            <span className="kpi-label">Total Results</span>
+            <span className="kpi-value">{total}</span>
           </div>
-        ) : (
-          <Table
-            items={data}
-            sortBy={filters.sortBy}
-            order={filters.order}
-            onSort={handleSort}
-          />
-        )}
+          {STATUS_KPIS.map(({ value, label }) => {
+            const isActive = filters.status === value;
+            return (
+              <div
+                key={value}
+                className={`kpi-card kpi-card--clickable kpi-card--${value.toLowerCase()}${isActive ? ' kpi-card--active' : ''}`}
+                onClick={() => handleStatusChange(isActive ? '' : value)}
+                role="button"
+                aria-pressed={isActive}
+              >
+                <span className="kpi-label">{label}</span>
+                <span className="kpi-value">{statusCounts[value] ?? 0}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="table-card">
+          <div className="table-card-header">
+            <h2 className="table-card-title">Items</h2>
+            <Filters
+              search={filters.search}
+              onSearchChange={handleSearchChange}
+            />
+          </div>
+
+          {error && <div className="error-banner">{error}</div>}
+
+          {initialLoad ? (
+            <div className="spinner-container">
+              <div className="spinner" />
+            </div>
+          ) : (
+            <Table
+              items={data}
+              sortBy={filters.sortBy}
+              order={filters.order}
+              onSort={handleSort}
+              loading={loading}
+            />
+          )}
+        </div>
+
         <Pagination
           page={filters.page}
           totalPages={totalPages}

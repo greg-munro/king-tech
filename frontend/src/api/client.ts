@@ -13,6 +13,7 @@ export interface PaginatedResponse {
   page: number;
   limit: number;
   totalPages: number;
+  statusCounts: Record<string, number>;
 }
 
 export interface FetchItemsParams {
