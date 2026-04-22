@@ -129,6 +129,12 @@ body {
   box-shadow: var(--shadow-hover);
 }
 
+.kpi-card--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* COMPLETED — green */
 .kpi-card--completed:hover,
 .kpi-card--completed.kpi-card--active {

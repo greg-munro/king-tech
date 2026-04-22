@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef, useTransition } from 'react';
 import { fetchItems } from './api/client';
 import type { FetchItemsParams, Item } from './api/client';
 import Table from './components/Table';
@@ -6,11 +6,14 @@ import Filters from './components/Filters';
 import Pagination from './components/Pagination';
 import './App.css';
 
+function isMobilePortrait() {
+  return window.innerWidth < 768 && window.innerHeight > window.innerWidth;
+}
+
 function useIsPortraitMobile() {
-  const check = () => window.innerWidth < 768 && window.innerHeight > window.innerWidth;
-  const [isPortraitMobile, setIsPortraitMobile] = useState(check);
+  const [isPortraitMobile, setIsPortraitMobile] = useState(isMobilePortrait);
   useEffect(() => {
-    const handler = () => setIsPortraitMobile(check());
+    const handler = () => setIsPortraitMobile(isMobilePortrait());
     window.addEventListener('resize', handler);
     window.addEventListener('orientationchange', handler);
     return () => {
@@ -49,6 +52,8 @@ const STATUS_KPIS: { value: string; label: string }[] = [
 
 export default function App() {
   const isPortraitMobile = useIsPortraitMobile();
+  const [, startTransition] = useTransition();
+  const [searchInput, setSearchInput] = useState('');
   const [state, setState] = useState<AppState>({
     data: [],
     loading: true,
@@ -68,7 +73,7 @@ export default function App() {
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = useCallback(async (params: FetchItemsParams) => {
+  const load = async (params: FetchItemsParams) => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const result = await fetchItems({ ...params, limit: LIMIT });
@@ -88,12 +93,12 @@ export default function App() {
         loading: false,
       }));
     }
-  }, []);
+  };
 
   useEffect(() => {
     const { search, status, sortBy, order, page } = state.filters;
     load({ search: search || undefined, status: status || undefined, sortBy, order, page });
-  }, [state.filters, load]);
+  }, [state.filters]);
 
   const updateFilters = (patch: Partial<AppState['filters']>) => {
     setState((prev) => ({
@@ -107,29 +112,35 @@ export default function App() {
   };
 
   const handleSearchChange = (val: string) => {
-    setState((prev) => ({
-      ...prev,
-      filters: { ...prev.filters, search: val },
-    }));
+    startTransition(() => setSearchInput(val));
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      updateFilters({ search: val });
-    }, DEBOUNCE_MS);
-  };
-
-  const handleStatusChange = (val: string) => updateFilters({ status: val });
-
-  const handleSort = (col: 'id' | 'name' | 'createdOn') => {
-    const { sortBy, order } = state.filters;
-    if (sortBy === col) {
-      updateFilters({ sortBy: col, order: order === 'asc' ? 'desc' : 'asc' });
+    if (val === '') {
+      updateFilters({ search: '' });
     } else {
-      updateFilters({ sortBy: col, order: 'asc' });
+      debounceTimer.current = setTimeout(() => {
+        updateFilters({ search: val });
+      }, DEBOUNCE_MS);
     }
   };
 
-  const handlePageChange = (page: number) =>
+  const handleStatusChange = (val: string) => {
+    updateFilters({ status: val });
+  };
+
+  const handleSort = (col: 'id' | 'name' | 'createdOn') => {
+    setState((prev) => {
+      const { sortBy, order } = prev.filters;
+      const newOrder = sortBy === col && order === 'asc' ? 'desc' : 'asc';
+      return {
+        ...prev,
+        filters: { ...prev.filters, sortBy: col, order: newOrder, page: 1 },
+      };
+    });
+  };
+
+  const handlePageChange = (page: number) => {
     setState((prev) => ({ ...prev, filters: { ...prev.filters, page } }));
+  };
 
   const { data, loading, initialLoad, error, total, totalPages, statusCounts, filters } = state;
 
@@ -154,16 +165,19 @@ export default function App() {
           </div>
           {STATUS_KPIS.map(({ value, label }) => {
             const isActive = filters.status === value;
+            const count = statusCounts[value] ?? 0;
+            const isDisabled = count === 0;
             return (
               <div
                 key={value}
-                className={`kpi-card kpi-card--clickable kpi-card--${value.toLowerCase()}${isActive ? ' kpi-card--active' : ''}`}
-                onClick={() => handleStatusChange(isActive ? '' : value)}
+                className={`kpi-card kpi-card--clickable kpi-card--${value.toLowerCase()}${isActive ? ' kpi-card--active' : ''}${isDisabled ? ' kpi-card--disabled' : ''}`}
+                onClick={isDisabled ? undefined : () => handleStatusChange(isActive ? '' : value)}
                 role="button"
                 aria-pressed={isActive}
+                aria-disabled={isDisabled}
               >
                 <span className="kpi-label">{label}</span>
-                <span className="kpi-value">{statusCounts[value] ?? 0}</span>
+                <span className="kpi-value">{count}</span>
               </div>
             );
           })}
@@ -173,7 +187,7 @@ export default function App() {
           <div className="table-card-header">
             <h2 className="table-card-title">Items</h2>
             <Filters
-              search={filters.search}
+              search={searchInput}
               onSearchChange={handleSearchChange}
             />
           </div>

@@ -28,7 +28,9 @@ export default function Pagination({ page, totalPages, total, limit, onPageChang
         >
           ‹
         </button>
-        <span className="page-indicator">Page {page} of {totalPages}</span>
+        <span className="page-indicator">
+          {totalPages === 0 ? 'No results' : `Page ${page} of ${totalPages}`}
+        </span>
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
