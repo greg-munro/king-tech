@@ -1,4 +1,4 @@
-# King Tech Challenge
+# King Table
 
 Monorepo — Express + TypeScript backend, React + TypeScript + Vite frontend.
 
