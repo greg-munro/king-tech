@@ -13,10 +13,13 @@ router.get('/', async (req, res) => {
     return;
   }
 
-  const items = await getData();
-  const result = processQuery(items, params);
-
-  res.json(result);
+  try {
+    const items = await getData();
+    const result = processQuery(items, params);
+    res.json(result);
+  } catch (err) {
+    res.status(502).json({ error: 'Failed to fetch upstream data' });
+  }
 });
 
 export default router;

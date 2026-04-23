@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useTransition } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { fetchItems } from './api/client';
 import type { FetchItemsParams, Item } from './api/client';
 import Table from './components/Table';
@@ -52,7 +52,6 @@ const STATUS_KPIS: { value: string; label: string }[] = [
 
 export default function App() {
   const isPortraitMobile = useIsPortraitMobile();
-  const [, startTransition] = useTransition();
   const [searchInput, setSearchInput] = useState('');
   const [state, setState] = useState<AppState>({
     data: [],
@@ -73,30 +72,33 @@ export default function App() {
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = async (params: FetchItemsParams) => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const result = await fetchItems({ ...params, limit: LIMIT });
-      setState((prev) => ({
-        ...prev,
-        data: result.data,
-        total: result.total,
-        totalPages: result.totalPages,
-        statusCounts: result.statusCounts,
-        loading: false,
-        initialLoad: false,
-      }));
-    } catch (err) {
-      setState((prev) => ({
-        ...prev,
-        error: err instanceof Error ? err.message : 'Unknown error',
-        loading: false,
-      }));
-    }
-  };
-
   useEffect(() => {
     const { search, status, sortBy, order, page } = state.filters;
+
+    const load = async (params: FetchItemsParams) => {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+
+      try {
+        const result = await fetchItems({ ...params, limit: LIMIT });
+
+        setState((prev) => ({
+          ...prev,
+          data: result.data,
+          total: result.total,
+          totalPages: result.totalPages,
+          statusCounts: result.statusCounts,
+          loading: false,
+          initialLoad: false,
+        }));
+      } catch (err) {
+        setState((prev) => ({
+          ...prev,
+          error: err instanceof Error ? err.message : 'Unknown error',
+          loading: false,
+        }));
+      }
+    };
+
     load({ search: search || undefined, status: status || undefined, sortBy, order, page });
   }, [state.filters]);
 
@@ -112,7 +114,7 @@ export default function App() {
   };
 
   const handleSearchChange = (val: string) => {
-    startTransition(() => setSearchInput(val));
+    setSearchInput(val);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     if (val === '') {
       updateFilters({ search: '' });
