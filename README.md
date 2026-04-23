@@ -22,6 +22,123 @@ Frontend proxies `/items` to `http://localhost:8001` — no CORS config needed.
 
 ---
 
+## Overview
+
+The app fetches a dataset of 500 items from Google Cloud Storage and exposes it through a REST API with server-side filtering, sorting, and pagination. The frontend is a thin React client that renders whatever the backend returns.
+
+---
+
+## Architecture
+
+### Backend
+
+The backend is the core of this solution. All data logic — filtering, sorting, pagination — lives here. The frontend has no knowledge of the dataset shape beyond what it receives in the API response.
+
+The data pipeline runs in a fixed order on every request:
+
+```
+GCS fetch → search (name) → filter (status) → sort → paginate
+```
+
+Order matters. Filtering before pagination ensures page counts and totals reflect the actual result set, not the full dataset.
+
+Each stage is a pure function in its own service module:
+
+```
+src/
+  routes/
+    items.route.ts        — validates query params, runs the pipeline, returns JSON
+  services/
+    data.service.ts       — fetches raw data from GCS
+    filter.service.ts     — search by name, filter by status
+    sort.service.ts       — sort by id / name / createdOn, asc/desc
+    pagination.service.ts — slice + compute totals and statusCounts
+    query.service.ts      — composes the pipeline
+  utils/
+    validateQuery.ts      — validates and normalises all query params
+```
+
+Pure functions make each stage independently testable and trivially replaceable. If the data source moved from GCS to a database, only `data.service.ts` changes.
+
+### API design
+
+```
+GET /items
+  ?search=abc        free text, partial case-insensitive match on name
+  &status=COMPLETED  exact match (case-insensitive)
+  &sortBy=name       id | name | createdOn
+  &order=asc         asc | desc
+  &page=1
+  &limit=20
+```
+
+Response shape:
+
+```json
+{
+  "data": [...],
+  "total": 87,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 5,
+  "statusCounts": {
+    "COMPLETED": 60,
+    "CANCELED": 20,
+    "ERROR": 7
+  }
+}
+```
+
+`statusCounts` is computed from the filtered result set (after search and status filter, before pagination). This means the KPI cards in the UI always reflect counts within the active filter context — not the full dataset — which is the correct product behaviour.
+
+### Frontend
+
+The frontend state model mirrors the API params directly:
+
+```ts
+filters: {
+  search, status, sortBy, order, page
+}
+```
+
+Any change to `filters` triggers a new API call. There is no client-side data manipulation. The frontend renders what the backend returns.
+
+UX details:
+- Search is debounced at 300ms to avoid firing a request on every keystroke
+- Clearing the search input fires immediately (no debounce delay)
+- Subsequent filter/sort/page changes dim the table rather than replacing it with a spinner, so the user retains context while the next page loads
+- Status KPI cards double as filter toggles; they are disabled when their count is 0
+
+---
+
+## Trade-offs and decisions
+
+**No database.** The dataset is fetched from GCS on every request. For 500 static records this is acceptable — GCS round-trip latency is the only overhead, and it keeps the solution self-contained with no infrastructure dependencies.
+
+**No caching.** The brief explicitly says caching is not a requirement. A simple in-memory cache with a TTL would be the natural next step (see below), but adding it without it being required would be optimising prematurely for a static test dataset.
+
+**No ORM, no query builder.** Filtering and sorting are plain array operations. For 500 records this is fast enough that introducing a query abstraction would add complexity with no benefit.
+
+**Vite proxy instead of CORS headers.** In development the frontend proxies `/items` to the backend, so no CORS configuration is needed. In production these would be served from the same origin or a reverse proxy would handle routing.
+
+**`statusCounts` in the paginate layer.** The counts are computed before slicing the page, which is the correct place — they need to reflect the full filtered result set, not just the current page.
+
+---
+
+## What I would add with more time
+
+**In-memory cache with TTL.** The GCS dataset is static. Caching it in memory for 60 seconds (or until process restart) would make every request after the first near-instant, since all filtering/sorting/pagination operates on local data. A simple module-level object with a timestamp is all it takes — no Redis, no external dependency.
+
+**Startup prefetch.** The server could fetch and cache the data before accepting connections. This removes any possibility of a slow first request and fails fast on startup if GCS is unreachable, rather than serving an error on the first real user request.
+
+**Database + indexing.** For a larger or dynamic dataset, moving to a database with indexes on `name`, `status`, and `createdOn` would make filtering and sorting O(log n) instead of O(n).
+
+**Input sanitisation.** The `search` and `status` params are passed through as-is after string coercion. For a production API these should be length-limited and stripped of control characters.
+
+**Pagination metadata in response headers.** Some API conventions put pagination metadata (`X-Total-Count`, `X-Total-Pages`) in response headers rather than the body. Either is valid; body was chosen here because it keeps the client code simpler.
+
+---
+
 ## Testing
 
 ### Backend — Unit tests (Jest)
