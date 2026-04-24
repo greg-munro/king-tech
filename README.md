@@ -2,7 +2,31 @@
 
 Monorepo — Express + TypeScript backend, React + TypeScript + Vite frontend.
 
-## Quick start
+GitHub: https://github.com/greg-munro/king-tech
+
+---
+
+## Docker (recommended)
+
+The fastest way to run the app. Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+```bash
+docker compose up --build
+```
+
+Then open http://localhost:3000.
+
+Both services start together. The frontend (nginx) proxies `/items` requests to the backend automatically — no configuration needed.
+
+To stop:
+
+```bash
+docker compose down
+```
+
+---
+
+## Quick start (without Docker)
 
 **Backend** (port 8001):
 ```bash
