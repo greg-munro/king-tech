@@ -1,6 +1,6 @@
 # King Tech Challenge
 
-Monorepo — Express + TypeScript backend, React + TypeScript + Vite frontend.
+Monorepo - Express + TypeScript backend, React + TypeScript + Vite frontend.
 
 GitHub: https://github.com/greg-munro/king-tech
 
@@ -16,7 +16,7 @@ docker compose up --build
 
 Then open http://localhost:3000.
 
-Both services start together. The frontend (nginx) proxies `/items` requests to the backend automatically — no configuration needed.
+Both services start together. The frontend (nginx) proxies `/items` requests to the backend automatically - no configuration needed.
 
 To stop:
 
@@ -42,7 +42,7 @@ npm install
 npm run dev
 ```
 
-Frontend proxies `/items` to `http://localhost:8001` — no CORS config needed.
+Frontend proxies `/items` to `http://localhost:8001` - no CORS config needed.
 
 ---
 
@@ -56,7 +56,7 @@ The app fetches a dataset of 500 items from Google Cloud Storage and exposes it 
 
 ### Backend
 
-The backend is the core of this solution. All data logic — filtering, sorting, pagination — lives here. The frontend has no knowledge of the dataset shape beyond what it receives in the API response.
+The backend is the core of this solution. All data logic - filtering, sorting, pagination - lives here. The frontend has no knowledge of the dataset shape beyond what it receives in the API response.
 
 The data pipeline runs in a fixed order on every request:
 
@@ -71,15 +71,15 @@ Each stage is a pure function in its own service module:
 ```
 src/
   routes/
-    items.route.ts        — validates query params, runs the pipeline, returns JSON
+    items.route.ts        - validates query params, runs the pipeline, returns JSON
   services/
-    data.service.ts       — fetches raw data from GCS
-    filter.service.ts     — search by name, filter by status
-    sort.service.ts       — sort by id / name / createdOn, asc/desc
-    pagination.service.ts — slice + compute totals and statusCounts
-    query.service.ts      — composes the pipeline
+    data.service.ts       - fetches raw data from GCS
+    filter.service.ts     - search by name, filter by status
+    sort.service.ts       - sort by id / name / createdOn, asc/desc
+    pagination.service.ts - slice + compute totals and statusCounts
+    query.service.ts      - composes the pipeline
   utils/
-    validateQuery.ts      — validates and normalises all query params
+    validateQuery.ts      - validates and normalises all query params
 ```
 
 Pure functions make each stage independently testable and trivially replaceable. If the data source moved from GCS to a database, only `data.service.ts` changes.
@@ -113,7 +113,7 @@ Response shape:
 }
 ```
 
-`statusCounts` is computed from the filtered result set (after search and status filter, before pagination). This means the KPI cards in the UI always reflect counts within the active filter context — not the full dataset — which is the correct product behaviour.
+`statusCounts` is computed from the filtered result set (after search and status filter, before pagination). This means the KPI cards in the UI always reflect counts within the active filter context - not the full dataset - which is the correct product behaviour.
 
 ### Frontend
 
@@ -137,7 +137,7 @@ UX details:
 
 ## Trade-offs and decisions
 
-**No database.** The dataset is fetched from GCS on every request. For 500 static records this is acceptable — GCS round-trip latency is the only overhead, and it keeps the solution self-contained with no infrastructure dependencies.
+**No database.** The dataset is fetched from GCS on every request. For 500 static records this is acceptable - GCS round-trip latency is the only overhead, and it keeps the solution self-contained with no infrastructure dependencies.
 
 **No caching.** The brief explicitly says caching is not a requirement. A simple in-memory cache with a TTL would be the natural next step (see below), but adding it without it being required would be optimising prematurely for a static test dataset.
 
@@ -145,13 +145,13 @@ UX details:
 
 **Vite proxy instead of CORS headers.** In development the frontend proxies `/items` to the backend, so no CORS configuration is needed. In production these would be served from the same origin or a reverse proxy would handle routing.
 
-**`statusCounts` in the paginate layer.** The counts are computed before slicing the page, which is the correct place — they need to reflect the full filtered result set, not just the current page.
+**`statusCounts` in the paginate layer.** The counts are computed before slicing the page, which is the correct place - they need to reflect the full filtered result set, not just the current page.
 
 ---
 
 ## What I would add with more time
 
-**In-memory cache with TTL.** The GCS dataset is static. Caching it in memory for 60 seconds (or until process restart) would make every request after the first near-instant, since all filtering/sorting/pagination operates on local data. A simple module-level object with a timestamp is all it takes — no Redis, no external dependency.
+**In-memory cache with TTL.** The GCS dataset is static. Caching it in memory for 60 seconds (or until process restart) would make every request after the first near-instant, since all filtering/sorting/pagination operates on local data. A simple module-level object with a timestamp is all it takes - no Redis, no external dependency.
 
 **Startup prefetch.** The server could fetch and cache the data before accepting connections. This removes any possibility of a slow first request and fails fast on startup if GCS is unreachable, rather than serving an error on the first real user request.
 
@@ -165,7 +165,7 @@ UX details:
 
 ## Testing
 
-### Backend — Unit tests (Jest)
+### Backend - Unit tests (Jest)
 
 45 unit tests covering the full data pipeline.
 
@@ -184,7 +184,7 @@ npm test
 
 ---
 
-### Frontend — Unit tests (Vitest)
+### Frontend - Unit tests (Vitest)
 
 9 unit tests for the API client (`src/api/client.ts`).
 
@@ -200,7 +200,7 @@ npm run test:unit:watch
 
 ---
 
-### Frontend — E2E tests (Playwright, Chromium)
+### Frontend - E2E tests (Playwright)
 
 10 end-to-end tests covering the main user flows against the running app.
 
@@ -215,7 +215,7 @@ npm run test:unit:watch
 | 7 | Sort by Name descending |
 | 8 | Next page advances to page 2 |
 | 9 | Previous page returns to page 1 |
-| 10 | No results state — empty table and correct pagination text |
+| 10 | No results state - empty table and correct pagination text |
 
 **Requires both servers to be running before executing.**
 
